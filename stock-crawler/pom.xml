@@ -1,0 +1,36 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>com.gary.stock</groupId>
+		<artifactId>stock-parent</artifactId>
+		<version>1.0.1-SNAPSHOT</version>
+	</parent>
+	<artifactId>stock-crawler</artifactId>
+	<dependencies>
+		<dependency>
+			<groupId>com.gary.stock</groupId>
+			<artifactId>stock-model</artifactId>
+			<version>${version.stock}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.gary.stock</groupId>
+			<artifactId>stock-common</artifactId>
+			<version>${version.stock}</version>
+		</dependency>
+		<dependency>
+			<groupId>us.codecraft</groupId>
+			<artifactId>webmagic-core</artifactId>
+			<exclusions>
+				<exclusion>
+					<artifactId>commons-collections</artifactId>
+					<groupId>commons-collections</groupId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>us.codecraft</groupId>
+			<artifactId>webmagic-extension</artifactId>
+		</dependency>
+	</dependencies>
+</project>

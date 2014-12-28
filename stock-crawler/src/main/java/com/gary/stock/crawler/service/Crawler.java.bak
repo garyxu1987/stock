@@ -1,0 +1,360 @@
+package com.gary.stock.crawler.service;
+
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.commons.lang.time.DateUtils;
+import org.apache.ibatis.session.SqlSession;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
+
+import com.gary.stock.crawler.CrawlerConst;
+import com.gary.stock.dao.mybatis.mapper.StockInfoPOMapper;
+import com.gary.stock.dao.mybatis.mapper.StockPricePOMapper;
+import com.gary.stock.model.bo.StockBO;
+import com.gary.stock.model.mybatis.StockInfoPO;
+import com.gary.stock.model.mybatis.StockInfoPOExample;
+import com.gary.stock.model.mybatis.StockPricePO;
+import com.gary.stock.model.mybatis.StockPricePOExample;
+
+@Component
+public class Crawler {
+
+	protected static Logger logger = LoggerFactory.getLogger(Crawler.class);
+	static Pattern stockInfoPattern = Pattern
+			.compile("[^\"]*\"([^,]+),([^\"]*)\";");
+
+	public static void main(String[] args) {
+	}
+
+	@Autowired
+	protected RestTemplate restTemplate;
+	@Autowired
+	private SqlSession session;
+	@Autowired
+	ThreadPoolTaskExecutor taskExecutor;
+
+	public String doCrawler(String url, HttpMethod method, Object... urlVar) {
+		MultiValueMap<String, String> headers = new LinkedMultiValueMap<String, String>();
+		// headers.add("Accept", "application/json");
+		// headers.add("Content-Type", "application/json");
+
+		MultiValueMap<String, String> param = new LinkedMultiValueMap<String, String>();
+		// headers.add("Accept", "application/json");
+		// headers.add("Content-Type", "application/json");
+		return restTemplate.exchange(url, method,
+				new HttpEntity<Object>(param, headers), String.class, urlVar)
+				.getBody();
+	}
+
+	public String doCrawler(String url, HttpMethod method,
+			HttpEntity<Object> httpEntity, Object... urlVar) {
+		return restTemplate.exchange(url, method, httpEntity, String.class,
+				urlVar).getBody();
+	}
+
+	public List<StockPricePO> getStockHistoryPrice(String stockCode,
+			String market, int day) throws Exception {
+
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+		Date today = new Date();
+
+		Calendar sc = Calendar.getInstance();
+		if (day == CrawlerConst.PRICE_DAY_ALL) {
+			sc.setTime(sdf.parse("1980-01-01"));
+		} else if (day == 0) {
+			StockPricePO price = getStockTodayPrice(stockCode, market);
+			if (price != null) {
+				List<StockPricePO> result = new ArrayList<StockPricePO>();
+				result.add(price);
+				return result;
+			} else {
+				return null;
+			}
+		} else {
+			sc.setTime(DateUtils.addDays(today, day * (-1)));
+		}
+		Calendar ec = Calendar.getInstance();
+		ec.setTime(today);
+
+		return getStockPrice(stockCode, market, sc, ec);
+	}
+
+	public StockPricePO getStockTodayPrice(String stockCode, String market) {
+		String strResult = getSinaStockAPIResult(stockCode, market);
+		Matcher m = stockInfoPattern.matcher(strResult);
+		if (m.find()) {
+			String[] data = (m.group(2)).split(",");
+			StockPricePO stockPricePO = new StockPricePO();
+			stockPricePO.setPriceDate(new Date());
+			stockPricePO.setPriceOpen(Float.valueOf(data[0]));
+			stockPricePO.setPriceHigh(Float.valueOf(data[3]));
+			stockPricePO.setPriceLow(Float.valueOf(data[4]));
+			stockPricePO.setPriceClose(Float.valueOf(data[2]));
+			stockPricePO.setPriceVolume(Float.valueOf(data[7]));
+			stockPricePO.setPriceAdjClose(Float.valueOf(data[2]));
+
+			return stockPricePO;
+		} else {
+			return null;
+		}
+	}
+
+	public List<StockPricePO> getStockPrice(String stockCode, String market,
+			Calendar startDate, Calendar endDate) throws Exception {
+		List<StockPricePO> result = new ArrayList<StockPricePO>();
+
+		final String fullUrl = "http://ichart.yahoo.com/table.csv?s={code}.{market}&a={smonth}&b={sday}&c={syear}&d={emonth}&e={eday}&f={eyear}&g=d";
+
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+		String strResult = doCrawler(fullUrl, HttpMethod.GET, stockCode,
+				market, startDate.get(Calendar.MONTH),
+				startDate.get(Calendar.DAY_OF_MONTH),
+				startDate.get(Calendar.YEAR), endDate.get(Calendar.MONTH),
+				endDate.get(Calendar.DAY_OF_MONTH), endDate.get(Calendar.YEAR));
+		boolean token = false;
+		for (String str : strResult.split("\n")) {
+			if (token) {
+				String[] data = str.split(",");
+				StockPricePO stockPricePO = new StockPricePO();
+				stockPricePO.setPriceDate(sdf.parse(data[0]));
+				stockPricePO.setPriceOpen(Float.valueOf(data[1]));
+				stockPricePO.setPriceHigh(Float.valueOf(data[2]));
+				stockPricePO.setPriceLow(Float.valueOf(data[3]));
+				stockPricePO.setPriceClose(Float.valueOf(data[4]));
+				stockPricePO.setPriceVolume(Float.valueOf(data[5]));
+				stockPricePO.setPriceAdjClose(Float.valueOf(data[6]));
+
+				result.add(stockPricePO);
+			} else {
+				token = true;
+			}
+		}
+		return result;
+
+	}
+
+	public StockInfoPO getStockInfo(String stockCode, String market) {
+		StockInfoPO result = new StockInfoPO();
+
+		String strResult = getSinaStockAPIResult(stockCode, market);
+		Matcher m = stockInfoPattern.matcher(strResult);
+		if (m.find()) {
+			result.setStockCode(stockCode);
+			result.setStockName(m.group(1));
+			result.setStockMarket(market);
+		} else {
+			result = null;
+		}
+		return result;
+
+	}
+
+	public StockBO getStock(String stockCode, String market, int day)
+			throws Exception {
+		logger.info("Getting stock: " + stockCode + " " + market);
+		StockBO result = new StockBO();
+		StockInfoPO info = getStockInfo(stockCode, market);
+		if (info != null) {
+			logger.info("Got Stock: " + stockCode + " " + market);
+
+			logger.info("Getting Stock Price: " + info.getStockCode() + " "
+					+ info.getStockMarket());
+			List<StockPricePO> pricePO = getStockHistoryPrice(stockCode,
+					market, day);
+			if (pricePO == null || pricePO.size() == 0) {
+				logger.info("Got Stock Price Failed: " + info.getStockCode()
+						+ " " + info.getStockMarket());
+				return null;
+			}
+
+			info.setStockOpenDate(pricePO.get(pricePO.size() - 1)
+					.getPriceDate());
+
+			result.setStockInfo(info);
+			result.setStockPrice(pricePO);
+			logger.info("Got Stock Price: " + info.getStockCode() + " "
+					+ info.getStockMarket() + " length:" + pricePO.size());
+
+			return result;
+		}
+		logger.info("Got Stock Failed: " + stockCode + " " + market);
+		return null;
+	}
+
+	private String getSinaStockAPIResult(String stockCode, String market) {
+		final String fullUrl = "http://hq.sinajs.cn/list={market}{code}";
+
+		return doCrawler(fullUrl, HttpMethod.GET,
+				CrawlerConst.MARKET_SHANGHAI.equals(market) ? "sh" : "sz",
+				stockCode);
+
+	}
+
+	public List<StockBO> getStocks(String source, int length, String market,
+			int day) throws Exception {
+		List<StockBO> result = new ArrayList<StockBO>();
+
+		for (int i = 0; i < length; i++) {
+			StockBO s = getStock(getCode(source, i), market, day);
+			if (s != null) {
+				result.add(s);
+			}
+		}
+
+		return result;
+	}
+
+	private String getCode(String source, int i) {
+		String temp = String.valueOf(i);
+		String code = source.substring(0, 6 - temp.length()) + temp;
+		return code;
+	}
+
+	public void storeStocks(String source, int length, String market, int day)
+			throws Exception {
+		storeStocks(source, length, market, true, day);
+	}
+
+	public void storeStocks(String source, int length, String market,
+			boolean multiThread, int day) throws Exception {
+		if (!multiThread) {
+			List<StockBO> list = getStocks(source, length, market, day);
+			if (list != null) {
+				for (StockBO stock : list) {
+					storeStock(stock);
+				}
+			}
+		} else {
+			final int eachLength = length / 100;
+			for (int i = 0; i < Math.ceil(length / eachLength); i++) {
+				final int ci = i * eachLength;
+				final String s = source;
+				final String m = market;
+				final int d = day;
+				taskExecutor.execute(new Runnable() {
+
+					public void run() {
+						try {
+							storeStocks(getCode(s, ci), eachLength, m, false, d);
+						} catch (Exception e) {
+							logger.error("", e);
+						}
+					}
+				});
+
+			}
+
+		}
+	}
+
+	public void storeAllStock(int days) throws Exception {
+		// 深市A股票
+		storeStocks("000000", 1000, CrawlerConst.MARKET_SHENZHEN, days);
+
+		// 深市B股票
+		// storeStocks("200000", 1000, CrawlerConst.MARKET_SHENZHEN);
+
+		// 沪市A股票
+		storeStocks("600000", 1000, CrawlerConst.MARKET_SHANGHAI, days);
+		storeStocks("601000", 1000, CrawlerConst.MARKET_SHANGHAI, days);
+		// // 沪市B股票
+		// // storeStocks("900000", 1000, CrawlerConst.MARKET_SHENZHEN);
+		//
+		// // // 沪市新股申购
+		// storeStocks("730000", 1000, CrawlerConst.MARKET_SHANGHAI, days);
+		// // // 沪市配股
+		// storeStocks("700000", 1000, CrawlerConst.MARKET_SHANGHAI, days);
+		// // // 深市配股
+		// storeStocks("003000", 1000, CrawlerConst.MARKET_SHENZHEN, days);
+		// //
+		// // // 中小板
+		// storeStocks("002000", 1000, CrawlerConst.MARKET_SHENZHEN, days);
+		// // // 创业板
+		// storeStocks("300000", 1000, CrawlerConst.MARKET_SHENZHEN, days);
+
+		for (;;) {
+			int count = taskExecutor.getActiveCount();
+			System.out.println("Active Threads : " + count);
+			try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+			if (count == 0) {
+				taskExecutor.shutdown();
+				break;
+			}
+		}
+	}
+
+	public void storeStock(String stockCode, String market, int days)
+			throws Exception {
+		storeStock(getStock(stockCode, market, days));
+	}
+
+	public void storeStock(StockBO stockBO) {
+		if (stockBO != null) {
+			StockInfoPO info = stockBO.getStockInfo();
+
+			StockInfoPOExample infoE = new StockInfoPOExample();
+			StockInfoPOExample.Criteria c = infoE.createCriteria();
+			c.andStockCodeEqualTo(info.getStockCode());
+			c.andStockMarketEqualTo(info.getStockMarket());
+
+			List<StockInfoPO> t1 = getStockInfoPOMapper()
+					.selectByExample(infoE);
+
+			int infoId;
+			if (t1 == null || t1.size() == 0) {
+				getStockInfoPOMapper().insert(info);
+				infoId = info.getStockId();
+			} else {
+				logger.info("Insert StockInfo: " + info.getStockCode() + " "
+						+ info.getStockMarket() + " " + info.getStockName());
+				infoId = t1.get(0).getStockId();
+			}
+
+			for (StockPricePO price : stockBO.getStockPrice()) {
+				logger.info("Insert StockPrice: " + info.getStockCode() + " "
+						+ info.getStockMarket() + " " + info.getStockName()
+						+ " at " + price.getPriceDate());
+				price.setStockId(infoId);
+
+				StockPricePOExample priceE = new StockPricePOExample();
+				StockPricePOExample.Criteria c1 = priceE.createCriteria();
+				c1.andPriceDateEqualTo(price.getPriceDate());
+				c1.andStockIdEqualTo(infoId);
+
+				List<StockPricePO> t2 = getStockPricePOMapper()
+						.selectByExample(priceE);
+
+				if (t2 == null || t2.size() == 0) {
+					getStockPricePOMapper().insert(price);
+				}
+			}
+		}
+
+	}
+
+	private StockInfoPOMapper getStockInfoPOMapper() {
+		return session.getMapper(StockInfoPOMapper.class);
+	}
+
+	private StockPricePOMapper getStockPricePOMapper() {
+		return session.getMapper(StockPricePOMapper.class);
+	}
+}

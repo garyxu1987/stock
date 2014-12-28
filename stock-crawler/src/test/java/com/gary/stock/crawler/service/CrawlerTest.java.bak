@@ -1,0 +1,58 @@
+package com.gary.stock.crawler.service;
+
+import org.apache.log4j.Logger;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+
+import com.gary.stock.crawler.CrawlerConst;
+
+@RunWith(SpringJUnit4ClassRunner.class)
+@ContextConfiguration(locations = { "classpath*:applicationContext.xml" })
+public class CrawlerTest extends Crawler {
+	private static Logger logger = Logger.getLogger(CrawlerTest.class);
+
+	@Autowired
+	Crawler main;
+
+	@Test
+	public void testGetStockHistory() throws Exception {
+		logger.info(main.getStockHistoryPrice("000416",
+				CrawlerConst.MARKET_SHENZHEN, CrawlerConst.PRICE_DAY_ALL)
+				.size());
+	}
+
+	@Test
+	public void testGetStockInfo() {
+		logger.info(main.getStockInfo("000416", CrawlerConst.MARKET_SHENZHEN));
+	}
+
+	@Test
+	public void testGetStockTodayPrice() {
+		// logger.info(
+		main.getStockTodayPrice("000416", CrawlerConst.MARKET_SHENZHEN);// );
+	}
+
+	@Test
+	public void testStoreStock() throws Exception {
+		main.storeStock("000004", CrawlerConst.MARKET_SHENZHEN, 1);
+	}
+
+	@Test
+	public void testStoreAllStock() throws Exception {
+		main.storeAllStock(CrawlerConst.PRICE_DAY_ALL);
+	}
+
+	@Test
+	public void testStorePartStock() throws Exception {
+		main.storeAllStock(3);
+	}
+
+	@Test
+	public void testStoreAllTodayStock() throws Exception {
+		main.storeAllStock(0);
+	}
+
+}

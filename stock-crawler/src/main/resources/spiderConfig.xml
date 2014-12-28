@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:tx="http://www.springframework.org/schema/tx" xmlns:jdbc="http://www.springframework.org/schema/jdbc"
+	xmlns:osgi="http://www.springframework.org/schema/osgi" xmlns:int="http://www.springframework.org/schema/integration"
+	xmlns:int-http="http://www.springframework.org/schema/integration/http"
+	xmlns:oxm="http://www.springframework.org/schema/oxm"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.0.xsd
+http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-3.0.xsd
+http://www.springframework.org/schema/jdbc http://www.springframework.org/schema/jdbc/spring-jdbc-3.0.xsd
+http://www.springframework.org/schema/osgi http://www.springframework.org/schema/osgi/spring-osgi-1.2.xsd
+http://www.springframework.org/schema/integration http://www.springframework.org/schema/integration/spring-integration.xsd
+http://www.springframework.org/schema/integration/http http://www.springframework.org/schema/integration/http/spring-integration-http.xsd
+http://www.springframework.org/schema/oxm http://www.springframework.org/schema/oxm/spring-oxm-3.0.xsd">
+
+	<!-- 深圳股票详细抓取配置信息 -->
+	<bean id="szStockInfoConfig" class="com.gary.stock.crawler.SpiderConfig">
+		<property name="baseUrl" value="http://www.szse.cn/" />
+		<property name="charset" value="gbk" />
+		<property name="requestBuilder" ref="szStockInfoRequestBuilder" />
+		<property name="pageProcessor" ref="szStockInfoPageProcessor" />
+		<property name="pipeline" ref="szStockInfoPipeline" />
+	</bean>
+	<!-- 沪市股票详细抓取配置信息 -->
+	<bean id="shStockInfoConfig" class="com.gary.stock.crawler.SpiderConfig">
+		<property name="baseUrl" value="http://www.sse.com.cn/" />
+		<property name="requestBuilder" ref="shStockInfoRequestBuilder" />
+		<property name="pageProcessor" ref="shStockInfoPageProcessor" />
+		<property name="pipeline" ref="shStockInfoPipeline" />
+	</bean>
+
+	<!-- 股票票价抓取配置信息 -->
+	<bean id="stockPriceConfig" class="com.gary.stock.crawler.SpiderConfig">
+		<property name="baseUrl" value="http://www.sse.com.cn/" />
+		<property name="threadsCount" value="48" />
+		<property name="requestBuilder" ref="stockPriceRequestBuilder" />
+		<property name="pageProcessor" ref="stockPricePageProcessor" />
+		<property name="pipeline" ref="stockPricePipeline" />
+		<property name="requestHeader" ref="stockPriceRequestHeader" />
+	</bean>
+	<bean id="lackStockPriceConfig" class="com.gary.stock.crawler.SpiderConfig">
+		<property name="baseUrl" value="http://www.sse.com.cn/" />
+		<property name="threadsCount" value="6" />
+		<property name="requestBuilder" ref="lackStockPriceRequestBuilder" />
+		<property name="pageProcessor" ref="stockPricePageProcessor" />
+		<property name="pipeline" ref="stockPricePipeline" />
+		<property name="requestHeader" ref="stockPriceRequestHeader" />
+	</bean>
+	<bean id="stockPriceRequestHeader" class="java.util.HashMap">
+		<constructor-arg>
+			<map>
+				<entry>
+					<key>
+						<value>Host</value>
+					</key>
+				<value>xueqiu.com</value>
+				</entry>
+				<entry>
+					<key>
+						<value>User-Agent</value>
+					</key>
+					<value>Mozilla/5.0 (Windows NT 6.3; WOW64; rv:34.0) Gecko/20100101 Firefox/34.0</value>
+				</entry>
+				<entry>
+					<key>
+						<value>Accept</value>
+					</key>
+					<value>text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8</value>
+				</entry>
+				<entry>
+					<key>
+						<value>Accept-Language</value>
+					</key>
+					<value>zh-cn,zh;q=0.8,en-us;q=0.5,en;q=0.3</value>
+				</entry>
+				<entry>
+					<key>
+						<value>Accept-Encoding</value>
+					</key>
+					<value>gzip, deflate</value>
+				</entry>
+				<entry>
+					<key>
+						<value>Cookie</value>
+					</key>
+					<value>xq_a_token=iBt8Vw4gttHJf5tebVh6Np; xq_r_token=YdddFup40PEowjp6J46Wmf; Hm_lvt_1db88642e346389874251b5a1eded6e3=1419649031; Hm_lpvt_1db88642e346389874251b5a1eded6e3=1419726605; __utma=1.1653467277.1419649031.1419690566.1419726602.7; __utmc=1; __utmz=1.1419649031.1.1.utmcsr=baidu|utmccn=(organic)|utmcmd=organic|utmctr=%D1%A9%C7%F2%CD%F8; __utmb=1.6.6.1419726605822; __utmt=1</value>
+				</entry>
+				<entry>
+					<key>
+						<value>Connection</value>
+					</key>
+					<value>keep-alive</value>
+				</entry>
+			</map>
+		</constructor-arg>
+	</bean>
+	<!-- 沪市股票详细抓取配置信息 -> <bean id="sinaTodayLackStockPriceConfig" class="com.gary.stock.crawler.SpiderConfig"> 
+		<property name="baseUrl" value="http://www.sse.com.cn/" /> <property name="threadsCount" 
+		value="1" /> <property name="requestBuilder" ref="sinaTodayLackStockPriceRequestBuilder" 
+		/> <property name="pageProcessor" ref="sinaTodayStockPricePageProcessor" 
+		/> <property name="pipeline" ref="sinaTodayStockPricePipeline" /> </bean> 
+		<bean id="yahooStockHistoryPriceConfig" class="com.gary.stock.crawler.SpiderConfig"> 
+		<property name="baseUrl" value="http://www.sse.com.cn/" /> <property name="threadsCount" 
+		value="2" /> <property name="requestBuilder" ref="yahooStockHistoryPriceRequestBuilder" 
+		/> <property name="pageProcessor" ref="yahooStockHistoryPricePageProcessor" 
+		/> <property name="pipeline" ref="yahooStockHistoryPricePipeline" /> </bean> 
+		<bean id="yahooStockLackHistoryPriceConfig" class="com.gary.stock.crawler.SpiderConfig"> 
+		<property name="baseUrl" value="http://www.sse.com.cn/" /> <property name="threadsCount" 
+		value="1" /> <property name="sleepTime" value="5000" /> <property name="requestBuilder" 
+		ref="yahooStockLackHistoryPriceRequestBuilder" /> <property name="pageProcessor" 
+		ref="yahooStockHistoryPricePageProcessor" /> <property name="pipeline" ref="yahooStockHistoryPricePipeline" 
+		/> </bean -->
+
+</beans>
