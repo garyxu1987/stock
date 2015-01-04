@@ -10,7 +10,7 @@ public class StockPrice {
 	@Id
 	private String id;
 
-	@Indexed
+	@Indexed(unique = true)
 	private Integer dateId;
 	// 成交量
 	private Double volume;
